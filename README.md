@@ -16,3 +16,8 @@ Visiting localhost:8080/3697404839 will redirect us to the url provided.
 
 
 You can also visit the path /view to view all hashses, but it will write to stdout not ResponseWriter  
+
+## TODO
+- [ ] distributed, use sharding
+- [ ] Add caching service
+- [ ] Load balancing
