@@ -1,4 +1,4 @@
-package main
+package helpers
 
 import (
 	"hash/crc32"
@@ -6,14 +6,14 @@ import (
 	"net"
 )
 
-func (app *application) crc_hash(data string, table *crc32.Table) uint32 {
+func Crc_hash(data string, table *crc32.Table) uint32 {
 	byte_data := []byte(data)
 	hashed_url := crc32.Checksum(byte_data, table)
 	return hashed_url
 
 }
 
-func (app *application) GetOutboundIP() net.IP {
+func GetOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)

@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"context"
@@ -10,21 +10,30 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type stat struct {
-	hash         int
-	url          string
-	clicks       int
-	date_created string
-	expiry_date  string
+type Data struct {
+	Hash         int
+	Url          string
+	Clicks       int
+	Date_created string
+	Expiry_date  string
 }
 
-// create_database is a method of application that is used to create a sqlite database and attach the db connection to application.db
-func (app *application) create_database() error {
+type Database struct {
+	db *sql.DB
+}
+
+// NewDatabase is a method of application that is used to create
+// a sqlite database and attach the db connection to application.db
+func NewDatabase(location string) (*Database, func() error, error) {
 	var err error
-	db, err := sql.Open("sqlite", app.conf.db_location)
+	db, err := sql.Open("sqlite", location)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
+	// err = db.Ping()
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
 
 	_, err = db.ExecContext(
 		context.Background(),
@@ -37,17 +46,16 @@ func (app *application) create_database() error {
 		);`,
 	)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	app.db = db
-	return nil
+	return &Database{db: db}, db.Close, nil
 }
 
-func (app *application) write(key uint32, value string) error {
+func (database *Database) Write(key uint32, value string) error {
 	date_now := time.Now().UTC().Format(time.RFC1123)
 	date_later := time.Now().UTC().Add(time.Hour * 24 * 30 * 2).Format(time.RFC1123) // set expiry to two months
-	result, err := app.db.ExecContext(
+	result, err := database.db.ExecContext(
 		context.Background(),
 		`INSERT into urls(hash, url, clicks, date_created, expiry_date) 
 		VALUES
@@ -66,9 +74,9 @@ func (app *application) write(key uint32, value string) error {
 	return nil
 }
 
-func (app *application) read(key string) (*stat, error) {
-	data := stat{}
-	rows, err := app.db.QueryContext(
+func (database *Database) Read(key string) (*Data, error) {
+	data := Data{}
+	rows, err := database.db.QueryContext(
 		context.Background(),
 		`SELECT * FROM urls WHERE hash=(?)`, key,
 	)
@@ -76,17 +84,17 @@ func (app *application) read(key string) (*stat, error) {
 		log.Fatalln(err)
 	}
 	for rows.Next() {
-		if err := rows.Scan(&data.hash, &data.url, &data.clicks, &data.date_created, &data.expiry_date); err != nil {
+		if err := rows.Scan(&data.Hash, &data.Url, &data.Clicks, &data.Date_created, &data.Expiry_date); err != nil {
 			return nil, err
 		}
 	}
 	return &data, nil
 }
 
-func (app *application) view() ([]stat, error) {
-	data := []stat{}
-	row_stat := stat{}
-	rows, err := app.db.QueryContext(
+func (database *Database) View() ([]Data, error) {
+	data := []Data{}
+	row_stat := Data{}
+	rows, err := database.db.QueryContext(
 		context.Background(),
 		`SELECT * FROM urls`,
 	)
@@ -94,7 +102,7 @@ func (app *application) view() ([]stat, error) {
 		return nil, err
 	}
 	for rows.Next() {
-		if err := rows.Scan(&row_stat.hash, &row_stat.url, &row_stat.clicks, &row_stat.date_created, &row_stat.expiry_date); err != nil {
+		if err := rows.Scan(&row_stat.Hash, &row_stat.Url, &row_stat.Clicks, &row_stat.Date_created, &row_stat.Expiry_date); err != nil {
 			return nil, err
 		}
 		data = append(data, row_stat)
@@ -103,8 +111,8 @@ func (app *application) view() ([]stat, error) {
 }
 
 // Increment the clicks field in the database using primary key, which is the hash
-func (app *application) increment_click(hash int) error {
-	result, err := app.db.ExecContext(
+func (database *Database) Increment(hash int) error {
+	result, err := database.db.ExecContext(
 		context.Background(),
 		"UPDATE urls SET clicks = clicks + 1 WHERE hash=(?)", hash,
 	)
@@ -122,7 +130,7 @@ func (app *application) increment_click(hash int) error {
 	return nil
 }
 
-func (app *application) test() {
+func (database *Database) Test() {
 	var err error
 	db, err := sql.Open("sqlite", "db.sqlite")
 	if err != nil {
